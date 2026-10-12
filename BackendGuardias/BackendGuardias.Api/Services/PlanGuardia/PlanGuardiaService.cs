@@ -58,6 +58,17 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
                 $"No existe el plan de guardia con ID {idPlanGuardia}.");
     }
 
+    public async Task<IReadOnlyList<VistaDetallePlanGuardia>> ObtenerDetallesAsync(
+        int idPlanGuardia)
+    {
+        ValidarId(idPlanGuardia, nameof(idPlanGuardia));
+
+        // Validar que exista el encabezado: una lista vacía de detalles
+        // no debe confundirse con un plan inexistente.
+        _ = await ObtenerPorIdAsync(idPlanGuardia);
+        return await _repository.ObtenerDetallesAsync(idPlanGuardia);
+    }
+
     // =========================================================
     // CREAR PLAN CON SUS DETALLES
     // =========================================================
