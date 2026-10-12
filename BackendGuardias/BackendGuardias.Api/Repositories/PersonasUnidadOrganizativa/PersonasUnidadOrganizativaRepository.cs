@@ -42,7 +42,12 @@ public sealed class PersonasUnidadOrganizativaRepository
                 IdUnidadOrganizativa = u.IdUnidadOrganizativa,
                 Nombre = u.Nombre,
                 Descripcion = u.Descripcion,
-                IdsUnidadesSuperiores = u.IdsUnidadesSuperiores
+                IdsUnidadesSuperiores = u.IdsUnidadesSuperiores,
+                IdCategoria = u.IdCategoria,
+                CategoriaNombre = u.CategoriaNombre,
+                CategoriaDescripcion = u.CategoriaDescripcion,
+                UnidadesSuperiores = u.UnidadesSuperiores,
+                UnidadesSuperioresDescripcion = u.UnidadesSuperioresDescripcion
             })
             .ToListAsync(cancellationToken);
 
@@ -183,7 +188,12 @@ public sealed class PersonasUnidadOrganizativaRepository
                 IdUnidadOrganizativa = u.IdUnidadOrganizativa,
                 Nombre = u.Nombre,
                 Descripcion = u.Descripcion,
-                IdsUnidadesSuperiores = u.IdsUnidadesSuperiores
+                IdsUnidadesSuperiores = u.IdsUnidadesSuperiores,
+                IdCategoria = u.IdCategoria,
+                CategoriaNombre = u.CategoriaNombre,
+                CategoriaDescripcion = u.CategoriaDescripcion,
+                UnidadesSuperiores = u.UnidadesSuperiores,
+                UnidadesSuperioresDescripcion = u.UnidadesSuperioresDescripcion
             })
             .ToListAsync(cancellationToken);
 

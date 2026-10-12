@@ -1,5 +1,6 @@
 using BackendGuardias.Api.DTOs.GruposGuardia;
 using BackendGuardias.Api.Models.Entities;
+using BackendGuardias.Api.Models.Views;
 using BackendGuardias.Api.Repositories.GruposGuardia;
 
 namespace BackendGuardias.Api.Services.GruposGuardia;
@@ -17,7 +18,7 @@ public sealed class GrupoGuardiaService : IGrupoGuardiaService
         bool incluirInactivos,
         CancellationToken cancellationToken)
     {
-        var grupos = await _repository.ObtenerTodosAsync(
+        var grupos = await _repository.ObtenerVistasAsync(
             incluirInactivos,
             cancellationToken);
 
@@ -28,7 +29,7 @@ public sealed class GrupoGuardiaService : IGrupoGuardiaService
         int id,
         CancellationToken cancellationToken)
     {
-        var grupo = await _repository.ObtenerPorIdAsync(id, cancellationToken);
+        var grupo = await _repository.ObtenerVistaPorIdAsync(id, cancellationToken);
         return grupo is null ? null : Mapear(grupo);
     }
 
@@ -67,7 +68,8 @@ public sealed class GrupoGuardiaService : IGrupoGuardiaService
 
         _repository.Agregar(entidad);
         await _repository.GuardarCambiosAsync(cancellationToken);
-        return Mapear(entidad);
+        var vista = await _repository.ObtenerVistaPorIdAsync(entidad.IdGrupoGuardia, cancellationToken);
+        return vista is null ? Mapear(entidad) : Mapear(vista);
     }
 
     public async Task<GrupoGuardiaDto?> ActualizarAsync(
@@ -121,7 +123,8 @@ public sealed class GrupoGuardiaService : IGrupoGuardiaService
             DateTime.Now;
 
         await _repository.GuardarCambiosAsync(cancellationToken);
-        return Mapear(entidad);
+        var vista = await _repository.ObtenerVistaPorIdAsync(entidad.IdGrupoGuardia, cancellationToken);
+        return vista is null ? Mapear(entidad) : Mapear(vista);
     }
 
     public async Task<bool> CambiarEstadoAsync(
@@ -146,6 +149,30 @@ public sealed class GrupoGuardiaService : IGrupoGuardiaService
         await _repository.GuardarCambiosAsync(cancellationToken);
 
         return true;
+    }
+
+    private static GrupoGuardiaDto Mapear(VistaGruposGuardia registro)
+    {
+        return new GrupoGuardiaDto
+        {
+            IdGrupoGuardia = registro.IdGrupoGuardia,
+            Nombre = registro.GrupoNombre,
+            Iniciales = registro.Iniciales,
+            SubordinadoAIdGrupoGuardia = registro.SubordinadoAIdGrupoGuardia,
+            GrupoPadreNombre = registro.GrupoPadreNombre,
+            GrupoPadreIniciales = registro.GrupoPadreIniciales,
+            Color = registro.Color,
+            Icono = registro.Icono,
+            Observacion = registro.Observacion,
+            Activo = registro.Activo ?? false,
+            CantidadPersonas = registro.CantidadPersonas,
+            IdPersonaCrea = registro.IdPersonaCrea,
+            PersonaCreaNombre = registro.PersonaCreaNombre,
+            IdPersonaActualiza = registro.IdPersonaActualiza,
+            PersonaActualizaNombre = registro.PersonaActualizaNombre,
+            FechaHoraCreado = registro.FechaHoraCreado,
+            FechaHoraActualizado = registro.FechaHoraActualizado
+        };
     }
 
     private static GrupoGuardiaDto Mapear(GrupoGuardia entidad)
