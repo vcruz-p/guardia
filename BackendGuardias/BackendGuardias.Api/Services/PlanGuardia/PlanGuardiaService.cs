@@ -443,16 +443,13 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
         // -----------------------------------------------------
         // 7. Recorrer cada día del período y cada grupo con
         // integrantes vigentes.
-        //
-        // Regla de sexo: las personas de sexo FEMENINO no se
-        // asignan a guardias de fines de semana (sábado/domingo).
+        // La planificación no excluye candidatos por sexo.
         // -----------------------------------------------------
 
         for (var fecha = fechaInicial.Date;
              fecha <= fechaFin.Date;
              fecha = fecha.AddDays(1))
         {
-            var esFinDeSemanaDelDia = EsFinDeSemana(fecha);
 
             var gruposDelDia = miembros
                 .Where(m =>
@@ -482,8 +479,6 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
                 {
                     // No asignar a quien tenga una afectación,
                     // cumpla años o ya tenga guardia ese día.
-                    // En fines de semana tampoco se asigna a
-                    // personas de sexo femenino.
                     var candidatos = miembrosGrupo
                         .Where(m =>
                             !personasAsignadasPorFecha.Contains(
@@ -494,9 +489,7 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
                                 fecha) &&
                             !EsCumpleanos(
                                 m.CarnetIdentidad,
-                                fecha) &&
-                            !(esFinDeSemanaDelDia &&
-                              EsMujer(m.Sexo)))
+                                fecha))
                         .ToList();
 
                     if (candidatos.Count == 0)
@@ -505,16 +498,10 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
                             .Select(m => m.GrupoNombre)
                             .FirstOrDefault() ?? grupo.Key.ToString();
 
-                        var motivoSexo = esFinDeSemanaDelDia &&
-                            miembrosGrupo.Any(m => !EsMujer(m.Sexo))
-                                ? string.Empty
-                                : " Las mujeres no se planifican en fines de semana.";
-
                         throw new InvalidOperationException(
                             $"No hay suficientes personas disponibles del grupo " +
-                            $"'{nombreGrupo}' el día {fecha:yyyy-MM-dd}." +
-                            motivoSexo +
-                            " No se creó el plan.");
+                            $"'{nombreGrupo}' el día {fecha:yyyy-MM-dd}. " +
+                            "No se creó el plan.");
                     }
 
                     // Orden de equidad:
@@ -917,29 +904,6 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
     {
         return fecha.DayOfWeek is
             DayOfWeek.Saturday or DayOfWeek.Sunday;
-    }
-
-    // =========================================================
-    // SEXO
-    //
-    // Regla del módulo: las mujeres (sexo "Femenino") no se
-    // planifican en fines de semana. Se aceptan las variantes
-    // más comunes del catálogo de sexos de la base `persona`.
-    // =========================================================
-
-    private static bool EsMujer(string? sexo)
-    {
-        if (string.IsNullOrWhiteSpace(sexo))
-        {
-            return false;
-        }
-
-        var valor = sexo.Trim();
-
-        return valor.Equals("F", StringComparison.OrdinalIgnoreCase) ||
-               valor.Equals("Femenino", StringComparison.OrdinalIgnoreCase) ||
-               valor.Equals("Mujer", StringComparison.OrdinalIgnoreCase) ||
-               valor.Equals("Female", StringComparison.OrdinalIgnoreCase);
     }
 
     // =========================================================
