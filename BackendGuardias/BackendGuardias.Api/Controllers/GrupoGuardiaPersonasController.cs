@@ -19,6 +19,68 @@ public sealed class GrupoGuardiaPersonasController : ControllerBase
     }
 
     /// <summary>
+    /// Lista los integrantes de un grupo con los datos descriptivos de persona,
+    /// sexo, color de piel, cargo, grado, unidad organizativa y auditoría.
+    /// Por defecto devuelve solo asignaciones vigentes. Use incluirHistoricas=true
+    /// para consultar también las asignaciones anteriores.
+    /// </summary>
+    [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ObtenerPersonas(
+        [FromRoute] int idGrupoGuardia,
+        [FromQuery] bool incluirHistoricas = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (idGrupoGuardia <= 0)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                mensaje = "El ID del grupo de guardia debe ser mayor que cero."
+            });
+        }
+
+        var grupoExiste = await _context.GrupoGuardia
+            .AsNoTracking()
+            .AnyAsync(g => g.IdGrupoGuardia == idGrupoGuardia, cancellationToken);
+
+        if (!grupoExiste)
+        {
+            return NotFound(new
+            {
+                success = false,
+                mensaje = "El grupo de guardia no existe."
+            });
+        }
+
+        var consulta = _context.VistaGrupoGuardiaPersona
+            .AsNoTracking()
+            .Where(p => p.IdGrupoGuardia == idGrupoGuardia);
+
+        if (!incluirHistoricas)
+        {
+            var hoy = DateTime.Today;
+            consulta = consulta.Where(p =>
+                p.Activo == true &&
+                p.FechaInicio <= hoy &&
+                (!p.FechaFin.HasValue || p.FechaFin.Value >= hoy));
+        }
+
+        var datos = await consulta
+            .OrderBy(p => p.Apellidos)
+            .ThenBy(p => p.Nombre)
+            .ToListAsync(cancellationToken);
+
+        return Ok(new
+        {
+            total = datos.Count,
+            data = datos
+        });
+    }
+
+    /// <summary>
     /// Asocia una persona a un grupo de guardia.
     /// Si tiene una asignación activa en otro grupo, la termina
     /// y crea una nueva conservando el historial y la auditoría.
