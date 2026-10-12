@@ -13,6 +13,9 @@ public interface IPlanGuardiaService
     Task<VistaPlanGuardia> ObtenerPorIdAsync(
         int idPlanGuardia);
 
+    Task<IReadOnlyList<VistaDetallePlanGuardia>> ObtenerDetallesAsync(
+        int idPlanGuardia);
+
     Task<VistaPlanGuardia> CrearAsync(
         PlanGuardiaCrearDto dto,
         int idPersonaActor);
