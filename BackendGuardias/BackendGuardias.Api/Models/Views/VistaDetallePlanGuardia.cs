@@ -1,0 +1,60 @@
+﻿using System;
+
+namespace BackendGuardias.Api.Models.Views;
+
+public partial class VistaDetallePlanGuardia
+{
+    public int IdDetallePlan { get; set; }
+
+    public int IdPlanGuardia { get; set; }
+
+    public DateTime PlanFechaInicial { get; set; }
+
+    public DateTime PlanFechaFin { get; set; }
+
+    public DateTime FechaGuardia { get; set; }
+
+    public TimeSpan? HoraInicio { get; set; }
+
+    public TimeSpan? HoraFin { get; set; }
+
+    public string? Observacion { get; set; }
+
+    public int IdGrupoGuardia { get; set; }
+
+    public string GrupoNombre { get; set; } = null!;
+
+    public string GrupoIniciales { get; set; } = null!;
+
+    public int IdPersona { get; set; }
+
+    public string Nombre { get; set; } = null!;
+
+    public string? Apellidos { get; set; }
+
+    public string? PersonaNombreCompleto { get; set; }
+
+    public string? CarnetIdentidad { get; set; }
+
+    public int? IdCargo { get; set; }
+
+    public string? CargoDescripcion { get; set; }
+
+    public int? IdGrado { get; set; }
+
+    public string? GradoDescripcion { get; set; }
+
+    public int? IdPersonaCrea { get; set; }
+
+    public string? PersonaCreaNombre { get; set; }
+
+    public int? IdPersonaActualiza { get; set; }
+
+    public string? PersonaActualizaNombre { get; set; }
+
+    public DateTime FechaHoraCreado { get; set; }
+
+    public DateTime FechaHoraActualizado { get; set; }
+
+    public int TieneAfectacionFuerzasMedios { get; set; }
+}

@@ -1,0 +1,42 @@
+@BackendGuardias.Api_HostAddress = http://localhost:5206
+
+### Listar grupos de guardia activos
+GET {{BackendGuardias.Api_HostAddress}}/api/grupos-guardia
+Accept: application/json
+
+### Obtener un grupo de guardia
+GET {{BackendGuardias.Api_HostAddress}}/api/grupos-guardia/1
+Accept: application/json
+
+### Crear un grupo de guardia
+POST {{BackendGuardias.Api_HostAddress}}/api/grupos-guardia
+Content-Type: application/json
+
+{
+  "nombre": "Grupo de ejemplo",
+  "iniciales": "GE",
+  "idPersonaCrea": 1,
+  "subordinadoAIdGrupoGuardia": null,
+  "color": "#336699",
+  "icono": null,
+  "observacion": null
+}
+
+### Actualizar un grupo de guardia
+PUT {{BackendGuardias.Api_HostAddress}}/api/grupos-guardia/1
+Content-Type: application/json
+
+{
+  "nombre": "Grupo de ejemplo actualizado",
+  "iniciales": "GEA",
+  "idPersonaActualiza": 1,
+  "subordinadoAIdGrupoGuardia": null,
+  "color": "#336699",
+  "icono": null,
+  "observacion": null,
+  "activo": true
+}
+
+### Cambiar estado del grupo
+PATCH {{BackendGuardias.Api_HostAddress}}/api/grupos-guardia/1/estado?activo=false
+Accept: application/json
