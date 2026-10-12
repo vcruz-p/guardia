@@ -259,6 +259,11 @@ public async Task<IReadOnlyList<UnidadOrganizativaArbolDto>>
                     u.IdUnidadOrganizativaPadre,
                 Nombre = u.Nombre,
                 Descripcion = u.Descripcion,
+                IdCategoria = u.IdCategoria,
+                CategoriaNombre = u.CategoriaNombre,
+                CategoriaDescripcion = u.CategoriaDescripcion,
+                UnidadesSuperiores = u.UnidadesSuperiores,
+                UnidadesSuperioresDescripcion = u.UnidadesSuperioresDescripcion,
 
                 Personas = incluirPersonas
                     ? personas
