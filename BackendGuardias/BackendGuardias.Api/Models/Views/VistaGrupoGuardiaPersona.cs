@@ -31,6 +31,12 @@ public partial class VistaGrupoGuardiaPersona
 
     public string? GradoDescripcion { get; set; }
 
+    /// <summary>
+    /// Sexo de la persona (p. ej. "Masculino" / "Femenino"),
+    /// traído desde la base `persona` por la vista de la BD.
+    /// </summary>
+    public string? Sexo { get; set; }
+
     public DateTime FechaInicio { get; set; }
 
     public DateTime? FechaFin { get; set; }

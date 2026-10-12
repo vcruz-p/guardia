@@ -64,6 +64,9 @@ public partial class GuardiasDbContext
             entity.Property(e => e.GradoDescripcion)
                 .HasColumnName("grado_descripcion");
 
+            entity.Property(e => e.Sexo)
+                .HasColumnName("sexo");
+
             entity.Property(e => e.IdsUnidadesSuperiores)
                 .HasColumnName("ids_unidades_superiores");
 

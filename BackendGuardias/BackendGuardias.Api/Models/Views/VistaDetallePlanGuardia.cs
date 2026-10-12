@@ -44,6 +44,12 @@ public partial class VistaDetallePlanGuardia
 
     public string? GradoDescripcion { get; set; }
 
+    /// <summary>
+    /// Sexo de la persona asignada (p. ej. "Masculino" / "Femenino"),
+    /// traído desde la base `persona` por la vista de la BD.
+    /// </summary>
+    public string? Sexo { get; set; }
+
     public int? IdPersonaCrea { get; set; }
 
     public string? PersonaCreaNombre { get; set; }
