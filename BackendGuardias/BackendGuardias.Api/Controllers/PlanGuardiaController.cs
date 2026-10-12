@@ -107,6 +107,45 @@ public sealed class PlanGuardiaController : ControllerBase
     }
 
     // =========================================================
+    // GET: api/PlanGuardia/{idPlanGuardia}/detalles
+    // Devuelve los detalles con persona, sexo, cargo, grado,
+    // unidad organizativa, grupo y estado en etiquetas legibles.
+    // =========================================================
+
+    [HttpGet("{idPlanGuardia:int}/detalles")]
+    [ProducesResponseType(typeof(IReadOnlyList<VistaDetallePlanGuardia>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<VistaDetallePlanGuardia>>> ObtenerDetalles(
+        [FromRoute] int idPlanGuardia)
+    {
+        try
+        {
+            var resultado = await _service.ObtenerDetallesAsync(idPlanGuardia);
+            return Ok(resultado);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { mensaje = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { mensaje = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error al consultar los detalles del plan {IdPlanGuardia}.",
+                idPlanGuardia);
+
+            return Problem(
+                title: "Error al consultar los detalles del plan de guardia.",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    // =========================================================
     // POST: api/PlanGuardia
     // Crear un plan con sus detalles.
     // El creador procede del usuario autenticado.
