@@ -17,9 +17,6 @@ public partial class DetallePlanGuardia
     public TimeSpan? HoraInicio { get; set; }
 
     public TimeSpan? HoraFin { get; set; }
-
-    public string? Resultado { get; set; }
-
     public string? Observacion { get; set; }
 
     public int? IdPersonaCrea { get; set; }

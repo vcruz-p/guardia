@@ -197,10 +197,6 @@ modelBuilder.Entity<CalendarioFeriado>(entity =>
 
             entity.Property(e => e.Observacion)
                 .HasMaxLength(500);
-
-            entity.Property(e => e.Resultado)
-                .HasMaxLength(100);
-
             entity.Property(e => e.FechaHoraCreado)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");
