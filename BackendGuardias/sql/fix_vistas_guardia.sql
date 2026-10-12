@@ -1,24 +1,36 @@
 -- =====================================================================
--- FIX VISTAS DEL ESQUEMA `guardia`
+-- FIX VISTAS DEL ESQUEMA `guardia` (v2)
 --
 -- Objetivo: que las vistas del módulo de guardias NO devuelvan solo el
--- id_persona, sino los DATOS COMPLETOS de la persona (nombre, apellidos,
--- nombre completo, carné de identidad, cargo, grado y SEXO), obtenidos
--- mediante JOIN con la tabla `persona`.`persona`.
+-- id_persona, sino los DATOS COMPLETOS de la persona (nombre,
+-- apellidos, nombre completo, carné de identidad, cargo actual, grado
+-- actual y SEXO).
 --
--- IMPORTANTE: este script NO modifica en absoluto la base `persona` ni
--- su tabla `persona`. Solo reescribe vistas del esquema `guardia`.
+-- IMPORTANTE: este script NO crea, modifica ni elimina NADA dentro de
+-- las bases `persona`, `estructura` ni `sistemas`. Solo reescribe
+-- vistas del esquema `guardia`.
 --
--- Suposiciones (según el modelo EF Core del backend):
---   * Las tablas de `guardia` almacenan id_persona, id_cargo, id_grado...
---     como columnas sueltas (sin FK hacia la base `persona`).
---   * La vista `vista_personas_afectaciones` proviene del sistema de
---     personas/afectaciones y NO se toca aquí.
---   * Los nombres de columnas de las vistas coinciden con las
---     convenciones snake_case usadas por GuardiasDbContext.
+-- Esquema real de `persona` (según el DDL proporcionado):
+--   persona.persona(id, nombre, apellidos, id_sexo, id_color_piel,
+--                   id_persona_inserta, carnet_identidad)
+--     -> NO tiene id_cargo / id_grado / id_unidad_organizativa.
+--   persona.sexo(id, nombre, descripcion)
+--   persona.persona_cargo(id, id_persona, id_cargo_unidad_organizativa,
+--                   fecha_introduccion_cargo, fecha_fin_cargo, ...)
+--     -> el CARGO y la UNIDAD se obtienen a través de
+--        estructura.unidad_organizativa_cargos (cargo + unidad).
+--   persona.persona_grado(id, id_persona, id_grado, fecha_insercion,
+--                   fecha_fin, ...)
+--     -> id_grado -> estructura.grado(id, descripcion).
 --
--- Ejecutar contra el servidor MySQL configurado en .env
--- (Server=192.168.4.33;Port=3306;Database=guardia).
+-- Reglas aplicadas:
+--   * Cargo vigente  = último registro de persona_cargo sin fecha_fin.
+--   * Grado vigente  = último registro de persona_grado sin fecha_fin.
+--   * Sexo           = COALESCE(sexo.nombre, sexo.descripcion)
+--                      ('Masculino' / 'Femenino').
+--   * Las personas sin cargo vigente simplemente NO aparecen en
+--     vista_personas_unidades_subordinacion (igual que antes), por lo
+--     que no pueden ser planificadas.
 -- =====================================================================
 
 USE guardia;
@@ -43,11 +55,11 @@ SELECT
     p.apellidos                       AS apellidos,
     CONCAT_WS(' ', p.nombre, p.apellidos) AS persona_nombre_completo,
     p.carnet_identidad                AS carnet_identidad,
-    p.id_cargo                        AS id_cargo,
-    c.descripcion                     AS cargo_descripcion,
-    p.id_grado                        AS id_grado,
-    g.descripcion                     AS grado_descripcion,
-    s.nombre                          AS sexo,
+    pc.id_cargo_unidad_organizativa   AS id_cargo,
+    car.descripcion                   AS cargo_descripcion,
+    pg.id_grado                       AS id_grado,
+    gr.descripcion                    AS grado_descripcion,
+    COALESCE(sx.nombre, sx.descripcion) AS sexo,
     ggp.fecha_inicio                  AS fecha_inicio,
     ggp.fecha_fin                     AS fecha_fin,
     ggp.activo                        AS activo,
@@ -60,19 +72,33 @@ FROM guardia.grupo_guardia_persona ggp
 INNER JOIN guardia.grupo_guardia gg
         ON gg.id_grupo_guardia = ggp.id_grupo_guardia
 LEFT JOIN persona.persona p
-       ON p.id_persona = ggp.id_persona
-LEFT JOIN persona.cargo c
-       ON c.id_cargo = p.id_cargo
-LEFT JOIN persona.grado g
-       ON g.id_grado = p.id_grado
-LEFT JOIN persona.sexo s
-       ON s.id_sexo = p.id_sexo;
+       ON p.id = ggp.id_persona
+-- Cargo vigente (último asignado sin fecha fin).
+LEFT JOIN persona.persona_cargo pc
+       ON pc.id = (SELECT MAX(pc2.id)
+                     FROM persona.persona_cargo pc2
+                    WHERE pc2.id_persona = p.id
+                      AND pc2.fecha_fin_cargo IS NULL)
+LEFT JOIN estructura.unidad_organizativa_cargos uoc
+       ON uoc.id = pc.id_cargo_unidad_organizativa
+LEFT JOIN estructura.cargos car
+       ON car.id = uoc.id_cargo
+-- Grado vigente (último asignado sin fecha fin).
+LEFT JOIN persona.persona_grado pg
+       ON pg.id = (SELECT MAX(pg2.id)
+                     FROM persona.persona_grado pg2
+                    WHERE pg2.id_persona = p.id
+                      AND pg2.fecha_fin IS NULL)
+LEFT JOIN estructura.grado gr
+       ON gr.id = pg.id_grado
+LEFT JOIN persona.sexo sx
+       ON sx.id = p.id_sexo;
 
 -- ---------------------------------------------------------------------
 -- 2. VISTA DETALLE PLAN GUARDIA
 --    Antes: solo id_persona.
---    Ahora: + datos completos de la persona asignada y de las personas
---           de auditoría (crea / actualiza), incluyendo el sexo.
+--    Ahora: + datos completos de la persona asignada (incluye sexo)
+--           y nombres de las personas de auditoría (crea / actualiza).
 -- ---------------------------------------------------------------------
 DROP VIEW IF EXISTS vista_detalle_plan_guardia;
 
@@ -90,19 +116,19 @@ SELECT
     gg.nombre                         AS grupo_nombre,
     gg.iniciales                      AS grupo_iniciales,
     dpg.id_persona                    AS id_persona,
-    p.nombre                          AS nombre,
-    p.apellidos                       AS apellidos,
-    CONCAT_WS(' ', p.nombre, p.apellidos) AS persona_nombre_completo,
-    p.carnet_identidad                AS carnet_identidad,
-    p.id_cargo                        AS id_cargo,
-    c.descripcion                     AS cargo_descripcion,
-    p.id_grado                        AS id_grado,
-    g.descripcion                     AS grado_descripcion,
-    s.nombre                          AS sexo,
+    per.nombre                        AS nombre,
+    per.apellidos                     AS apellidos,
+    CONCAT_WS(' ', per.nombre, per.apellidos) AS persona_nombre_completo,
+    per.carnet_identidad              AS carnet_identidad,
+    pc.id_cargo_unidad_organizativa   AS id_cargo,
+    car.descripcion                   AS cargo_descripcion,
+    pgr.id_grado                      AS id_grado,
+    gr.descripcion                    AS grado_descripcion,
+    COALESCE(sx.nombre, sx.descripcion) AS sexo,
     dpg.id_persona_crea               AS id_persona_crea,
-    CONCAT_WS(' ', pc.nombre, pc.apellidos) AS persona_crea_nombre,
+    CONCAT_WS(' ', pcrea.nombre, pcrea.apellidos) AS persona_crea_nombre,
     dpg.id_persona_actualiza          AS id_persona_actualiza,
-    CONCAT_WS(' ', pu.nombre, pu.apellidos) AS persona_actualiza_nombre,
+    CONCAT_WS(' ', pact.nombre, pact.apellidos) AS persona_actualiza_nombre,
     dpg.fecha_hora_creado             AS fecha_hora_creado,
     dpg.fecha_hora_actualizado        AS fecha_hora_actualizado,
     CASE WHEN EXISTS (
@@ -119,23 +145,36 @@ INNER JOIN guardia.plan_guardia pg
         ON pg.id_plan_guardia = dpg.id_plan_guardia
 INNER JOIN guardia.grupo_guardia gg
         ON gg.id_grupo_guardia = dpg.id_grupo_guardia
-LEFT JOIN persona.persona p
-       ON p.id_persona = dpg.id_persona
-LEFT JOIN persona.cargo c
-       ON c.id_cargo = p.id_cargo
-LEFT JOIN persona.grado g
-       ON g.id_grado = p.id_grado
-LEFT JOIN persona.sexo s
-       ON s.id_sexo = p.id_sexo
-LEFT JOIN persona.persona pc
-       ON pc.id_persona = dpg.id_persona_crea
-LEFT JOIN persona.persona pu
-       ON pu.id_persona = dpg.id_persona_actualiza;
+LEFT JOIN persona.persona per
+       ON per.id = dpg.id_persona
+LEFT JOIN persona.persona_cargo pc
+       ON pc.id = (SELECT MAX(pc2.id)
+                     FROM persona.persona_cargo pc2
+                    WHERE pc2.id_persona = per.id
+                      AND pc2.fecha_fin_cargo IS NULL)
+LEFT JOIN estructura.unidad_organizativa_cargos uoc
+       ON uoc.id = pc.id_cargo_unidad_organizativa
+LEFT JOIN estructura.cargos car
+       ON car.id = uoc.id_cargo
+LEFT JOIN persona.persona_grado pgr
+       ON pgr.id = (SELECT MAX(pgr2.id)
+                      FROM persona.persona_grado pgr2
+                     WHERE pgr2.id_persona = per.id
+                       AND pgr2.fecha_fin IS NULL)
+LEFT JOIN estructura.grado gr
+       ON gr.id = pgr.id_grado
+LEFT JOIN persona.sexo sx
+       ON sx.id = per.id_sexo
+LEFT JOIN persona.persona pcrea
+       ON pcrea.id = dpg.id_persona_crea
+LEFT JOIN persona.persona pact
+       ON pact.id = dpg.id_persona_actualiza;
 
 -- ---------------------------------------------------------------------
 -- 3. VISTA RESPONSABLE APROBACIÓN GUARDIA
---    Igual que antes + datos de la persona responsable (nombre completo,
---    carnet y sexo) en lugar de solo el id.
+--    Datos de la persona responsable (nombre completo, carné, sexo)
+--    en lugar de solo el id. La unidad organizativa vive en el esquema
+--    `estructura` (no existe persona.unidad_organizativa).
 -- ---------------------------------------------------------------------
 DROP VIEW IF EXISTS vista_responsable_aprobacion_guardia;
 
@@ -143,7 +182,7 @@ CREATE VIEW vista_responsable_aprobacion_guardia AS
 SELECT
     rag.id_responsable                AS id_responsable,
     rag.id_unidad_organizativa        AS id_unidad_organizativa,
-    uo.nombre                         AS unidad_organizativa_nombre,
+    uo.descripcion                    AS unidad_organizativa_nombre,
     uo.descripcion                    AS unidad_organizativa_descripcion,
     rag.tipo                          AS tipo,
     rag.id_persona                    AS id_persona,
@@ -151,60 +190,111 @@ SELECT
     p.apellidos                       AS apellidos,
     CONCAT_WS(' ', p.nombre, p.apellidos) AS persona_nombre_completo,
     p.carnet_identidad                AS carnet_identidad,
-    s.nombre                          AS sexo,
+    COALESCE(sx.nombre, sx.descripcion) AS sexo,
+    pc.id_cargo_unidad_organizativa   AS id_cargo,
+    car.descripcion                   AS cargo_descripcion,
+    pgr.id_grado                      AS id_grado,
+    gr.descripcion                    AS grado_descripcion,
+    rag.id_persona_crea               AS id_persona_crea,
+    CONCAT_WS(' ', pcrea.nombre, pcrea.apellidos) AS persona_crea_nombre,
     rag.fecha_hora_creado             AS fecha_hora_creado,
     rag.fecha_hora_actualizado        AS fecha_hora_actualizado
 FROM guardia.responsable_aprobacion_guardia rag
-LEFT JOIN persona.unidad_organizativa uo
-       ON uo.id_unidad_organizativa = rag.id_unidad_organizativa
+LEFT JOIN estructura.unidad_organizativa uo
+       ON uo.id = rag.id_unidad_organizativa
 LEFT JOIN persona.persona p
-       ON p.id_persona = rag.id_persona
-LEFT JOIN persona.sexo s
-       ON s.id_sexo = p.id_sexo;
+       ON p.id = rag.id_persona
+LEFT JOIN persona.sexo sx
+       ON sx.id = p.id_sexo
+LEFT JOIN persona.persona_cargo pc
+       ON pc.id = (SELECT MAX(pc2.id)
+                     FROM persona.persona_cargo pc2
+                    WHERE pc2.id_persona = p.id
+                      AND pc2.fecha_fin_cargo IS NULL)
+LEFT JOIN estructura.unidad_organizativa_cargos uoc
+       ON uoc.id = pc.id_cargo_unidad_organizativa
+LEFT JOIN estructura.cargos car
+       ON car.id = uoc.id_cargo
+LEFT JOIN persona.persona_grado pgr
+       ON pgr.id = (SELECT MAX(pgr2.id)
+                      FROM persona.persona_grado pgr2
+                     WHERE pgr2.id_persona = p.id
+                       AND pgr2.fecha_fin IS NULL)
+LEFT JOIN estructura.grado gr
+       ON gr.id = pgr.id_grado
+LEFT JOIN persona.persona pcrea
+       ON pcrea.id = rag.id_persona_crea;
 
 -- ---------------------------------------------------------------------
 -- 4. VISTA PERSONAS UNIDADES SUBORDINACIÓN
---    Se mantiene igual que la definición actual del backend pero
---    añadiendo la columna `sexo`, necesaria para que la planificación
---    automática pueda excluir a las mujeres de los fines de semana.
+--    Personas con su unidad organizativa (derivada del cargo vigente),
+--    su cargo, su grado y su SEXO. Necesaria para la planificación
+--    automática (regla: mujeres fuera de fines de semana) y para el
+--    catálogo de personas disponibles.
+--    NOTA: solo aparecen personas con cargo vigente (unidad conocida).
 -- ---------------------------------------------------------------------
 DROP VIEW IF EXISTS vista_personas_unidades_subordinacion;
 
 CREATE VIEW vista_personas_unidades_subordinacion AS
 SELECT
-    p.id_persona                      AS id_persona,
+    p.id                              AS id_persona,
     p.nombre                          AS nombre,
     p.apellidos                       AS apellidos,
     CONCAT_WS(' ', p.nombre, p.apellidos) AS nombre_completo,
     p.carnet_identidad                AS carnet_identidad,
-    p.id_unidad_organizativa          AS id_unidad_organizativa,
+    uoc.id_unidad_organizativa        AS id_unidad_organizativa,
     uo.nombre                         AS unidad_organizativa_nombre,
     uo.descripcion                    AS unidad_organizativa_descripcion,
-    p.id_cargo                        AS id_cargo,
-    c.descripcion                     AS cargo_descripcion,
-    p.id_grado                        AS id_grado,
-    g.descripcion                     AS grado_descripcion,
-    s.nombre                          AS sexo,
-    uo.ids_unidades_superiores        AS ids_unidades_superiores,
-    uo.unidades_superiores            AS unidades_superiores,
-    uo.unidades_superiores_descripcion AS unidades_superiores_descripcion
+    pc.id_cargo_unidad_organizativa   AS id_cargo,
+    car.descripcion                   AS cargo_descripcion,
+    pgr.id_grado                      AS id_grado,
+    gr.descripcion                    AS grado_descripcion,
+    COALESCE(sx.nombre, sx.descripcion) AS sexo,
+    anc.IdsUnidadesSuperiores         AS ids_unidades_superiores,
+    GROUP_CONCAT(DISTINCT auo.nombre ORDER BY auo.nombre SEPARATOR ' | ')
+                                      AS unidades_superiores,
+    GROUP_CONCAT(DISTINCT auo.descripcion ORDER BY auo.descripcion SEPARATOR ' | ')
+                                      AS unidades_superiores_descripcion
 FROM persona.persona p
-LEFT JOIN persona.unidad_organizativa uo
-       ON uo.id_unidad_organizativa = p.id_unidad_organizativa
-LEFT JOIN persona.cargo c
-       ON c.id_cargo = p.id_cargo
-LEFT JOIN persona.grado g
-       ON g.id_grado = p.id_grado
-LEFT JOIN persona.sexo s
-       ON s.id_sexo = p.id_sexo;
+INNER JOIN persona.persona_cargo pc
+       ON pc.id = (SELECT MAX(pc2.id)
+                     FROM persona.persona_cargo pc2
+                    WHERE pc2.id_persona = p.id
+                      AND pc2.fecha_fin_cargo IS NULL)
+INNER JOIN estructura.unidad_organizativa_cargos uoc
+       ON uoc.id = pc.id_cargo_unidad_organizativa
+INNER JOIN estructura.unidad_organizativa uo
+       ON uo.id = uoc.id_unidad_organizativa
+LEFT JOIN estructura.cargos car
+       ON car.id = uoc.id_cargo
+LEFT JOIN persona.persona_grado pgr
+       ON pgr.id = (SELECT MAX(pgr2.id)
+                      FROM persona.persona_grado pgr2
+                     WHERE pgr2.id_persona = p.id
+                       AND pgr2.fecha_fin IS NULL)
+LEFT JOIN estructura.grado gr
+       ON gr.id = pgr.id_grado
+LEFT JOIN persona.sexo sx
+       ON sx.id = p.id_sexo
+-- Ancestros de la unidad (para el filtro de subordinación).
+LEFT JOIN guardia.vista_arbol_unidades_organizativas anc
+       ON anc.IdUnidadOrganizativa = uoc.id_unidad_organizativa
+LEFT JOIN estructura.unidad_organizativa auo
+       ON FIND_IN_SET(auo.id, COALESCE(anc.IdsUnidadesSuperiores, '')) > 0
+GROUP BY
+    p.id, p.nombre, p.apellidos, p.carnet_identidad,
+    uoc.id_unidad_organizativa, uo.nombre, uo.descripcion,
+    pc.id_cargo_unidad_organizativa, car.descripcion,
+    pgr.id_grado, gr.descripcion, sx.nombre, sx.descripcion;
 
 -- =====================================================================
--- NOTA: si en su servidor las tablas auxiliares tienen otros nombres
--- (por ejemplo `persona.tabla_sexo`, `persona.cargos`...), ajuste los
--- JOIN de arriba. La única columna imprescindible para el backend es
--- `sexo` (nombre del sexo, p. ej. 'Masculino' / 'Femenino'), que debe
--- estar presente en:
+-- NOTA: si la vista `vista_arbol_unidades_organizativas` de su servidor
+-- usa nombres de columna distintos (p. ej. id_unidad_organizativa /
+-- ids_unidades_superiores en minúsculas), ajuste los alias `anc.*`
+-- de arriba. La columna imprescindible para el backend es `sexo`
+-- ('Masculino' / 'Femenino'), presente en:
 --   - vista_grupo_guardia_persona
 --   - vista_detalle_plan_guardia
+--   - vista_responsable_aprobacion_guardia
 --   - vista_personas_unidades_subordinacion
 -- =====================================================================

@@ -20,6 +20,12 @@ public partial class VistaResponsableAprobacionGuardia
 
     public string? CarnetIdentidad { get; set; }
 
+    /// <summary>
+    /// Sexo de la persona (p. ej. "Masculino" / "Femenino"),
+    /// traído desde la base `persona` por la vista de la BD.
+    /// </summary>
+    public string? Sexo { get; set; }
+
     public int? IdCargo { get; set; }
 
     public string? CargoDescripcion { get; set; }
