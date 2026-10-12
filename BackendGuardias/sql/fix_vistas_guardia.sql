@@ -391,7 +391,7 @@ LEFT JOIN persona.persona pcrea
 -- 4. VISTA PERSONAS UNIDADES SUBORDINACIÓN
 --    Personas con su unidad organizativa (derivada del cargo vigente),
 --    su cargo, su grado y su SEXO. Necesaria para la planificación
---    automática (regla: mujeres fuera de fines de semana) y para el
+--    automática y para el
 --    catálogo de personas disponibles.
 --    NOTA: solo aparecen personas con cargo vigente (unidad conocida).
 -- ---------------------------------------------------------------------
