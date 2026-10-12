@@ -1,9 +1,18 @@
 using BackendGuardias.Api.Models.Entities;
+using BackendGuardias.Api.Models.Views;
 
 namespace BackendGuardias.Api.Repositories.GruposGuardia;
 
 public interface IGrupoGuardiaRepository
 {
+    Task<IReadOnlyList<VistaGruposGuardia>> ObtenerVistasAsync(
+        bool incluirInactivos,
+        CancellationToken cancellationToken);
+
+    Task<VistaGruposGuardia?> ObtenerVistaPorIdAsync(
+        int id,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<GrupoGuardia>> ObtenerTodosAsync(
         bool incluirInactivos,
         CancellationToken cancellationToken);
