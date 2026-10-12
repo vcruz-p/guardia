@@ -28,9 +28,9 @@
 --   * Grado vigente  = último registro de persona_grado sin fecha_fin.
 --   * Sexo           = COALESCE(sexo.nombre, sexo.descripcion)
 --                      ('Masculino' / 'Femenino').
---   * Las personas sin cargo vigente simplemente NO aparecen en
---     vista_personas_unidades_subordinacion (igual que antes), por lo
---     que no pueden ser planificadas.
+--   * El catálogo conserva todas las personas. Si no hay cargo o grado
+--     vigente, sus campos profesionales quedan NULL; las consultas por
+--     unidad filtran a las personas que sí tienen una unidad asignada.
 -- =====================================================================
 
 USE guardia;
