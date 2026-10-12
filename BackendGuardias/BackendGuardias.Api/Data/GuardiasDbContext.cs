@@ -653,12 +653,48 @@ modelBuilder.Entity<CalendarioFeriado>(entity =>
 
         // =========================================================
         // VISTA GRUPO GUARDIA PERSONA
+        //
+        // Devuelve los miembros del grupo con los DATOS de la
+        // persona (nombre, apellidos, carné, cargo, grado y sexo)
+        // en lugar del simple id_persona. Las columnas de datos
+        // profesionales se mapean explícitamente porque no siguen
+        // la convención snake_case automática del nombre de la
+        // propiedad C# (p. ej. PersonaNombreCompleto ->
+        // persona_nombre_completo coincide, pero CargoDescripcion
+        // proviene de estructura.cargos.descripcion).
         // =========================================================
 
         modelBuilder.Entity<VistaGrupoGuardiaPersona>(entity =>
         {
             entity.HasNoKey()
                 .ToView("vista_grupo_guardia_persona");
+
+            entity.Property(e => e.Nombre)
+                .HasColumnName("nombre");
+
+            entity.Property(e => e.Apellidos)
+                .HasColumnName("apellidos");
+
+            entity.Property(e => e.PersonaNombreCompleto)
+                .HasColumnName("persona_nombre_completo");
+
+            entity.Property(e => e.CarnetIdentidad)
+                .HasColumnName("carnet_identidad");
+
+            entity.Property(e => e.IdCargo)
+                .HasColumnName("id_cargo");
+
+            entity.Property(e => e.CargoDescripcion)
+                .HasColumnName("cargo_descripcion");
+
+            entity.Property(e => e.IdGrado)
+                .HasColumnName("id_grado");
+
+            entity.Property(e => e.GradoDescripcion)
+                .HasColumnName("grado_descripcion");
+
+            entity.Property(e => e.Sexo)
+                .HasColumnName("sexo");
 
             entity.Property(e => e.FechaInicio)
                 .HasColumnType("date");
@@ -858,6 +894,38 @@ modelBuilder.Entity<CalendarioFeriado>(entity =>
         {
             entity.HasNoKey()
                 .ToView("vista_responsable_aprobacion_guardia");
+
+            // Datos de la persona responsable (sustituyen al
+            // simple id_persona en las respuestas del API).
+            entity.Property(e => e.Nombre)
+                .HasColumnName("nombre");
+
+            entity.Property(e => e.Apellidos)
+                .HasColumnName("apellidos");
+
+            entity.Property(e => e.PersonaNombreCompleto)
+                .HasColumnName("persona_nombre_completo");
+
+            entity.Property(e => e.CarnetIdentidad)
+                .HasColumnName("carnet_identidad");
+
+            entity.Property(e => e.IdCargo)
+                .HasColumnName("id_cargo");
+
+            entity.Property(e => e.CargoDescripcion)
+                .HasColumnName("cargo_descripcion");
+
+            entity.Property(e => e.IdGrado)
+                .HasColumnName("id_grado");
+
+            entity.Property(e => e.GradoDescripcion)
+                .HasColumnName("grado_descripcion");
+
+            entity.Property(e => e.Sexo)
+                .HasColumnName("sexo");
+
+            entity.Property(e => e.PersonaCreaNombre)
+                .HasColumnName("persona_crea_nombre");
 
             entity.Property(e => e.FechaHoraCreado)
                 .HasColumnType("datetime");
