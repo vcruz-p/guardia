@@ -28,15 +28,29 @@ builder.WebHost.ConfigureKestrel(options =>
 // CONEXIÓN A BASE DE DATOS
 // ============================================================
 
+// La cadena puede configurarse de cualquiera de estas formas:
+// 1. appsettings.json / appsettings.Development.json:
+//    ConnectionStrings:GuardiasConnection
+// 2. Variable de entorno estándar:
+//    ConnectionStrings__GuardiasConnection
+// 3. Variable de entorno alternativa en el archivo .env:
+//    GUARDIAS_CONNECTION_STRING
 var connectionString =
-    builder.Configuration.GetConnectionString(
-        "GuardiasConnection"
-    );
+    builder.Configuration.GetConnectionString("GuardiasConnection");
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    connectionString =
+        Environment.GetEnvironmentVariable("GUARDIAS_CONNECTION_STRING");
+}
 
 if (string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException(
-        "No se encontró la cadena de conexión 'GuardiasConnection'."
+        "Falta configurar la conexión MySQL 'GuardiasConnection'. " +
+        "Cree BackendGuardias.Api/.env a partir de .env.example y configure " +
+        "GUARDIAS_CONNECTION_STRING, o defina la variable de entorno " +
+        "ConnectionStrings__GuardiasConnection. No incluya credenciales reales en Git."
     );
 }
 
