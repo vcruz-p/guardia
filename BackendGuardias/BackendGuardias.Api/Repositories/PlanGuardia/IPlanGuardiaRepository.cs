@@ -21,6 +21,9 @@ public interface IPlanGuardiaRepository
     Task<VistaPlanGuardia?> ObtenerVistaPorIdAsync(
         int idPlanGuardia);
 
+    Task<IReadOnlyList<VistaDetallePlanGuardia>> ObtenerDetallesAsync(
+        int idPlanGuardia);
+
     Task<PlanGuardiaEntity?> ObtenerEntidadPorIdAsync(
         int idPlanGuardia);
 

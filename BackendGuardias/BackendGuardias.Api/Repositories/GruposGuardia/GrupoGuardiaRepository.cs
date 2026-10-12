@@ -1,5 +1,6 @@
 using BackendGuardias.Api.Data;
 using BackendGuardias.Api.Models.Entities;
+using BackendGuardias.Api.Models.Views;
 using Microsoft.EntityFrameworkCore;
 
 namespace BackendGuardias.Api.Repositories.GruposGuardia;
@@ -11,6 +12,31 @@ public sealed class GrupoGuardiaRepository : IGrupoGuardiaRepository
     public GrupoGuardiaRepository(GuardiasDbContext context)
     {
         _context = context;
+    }
+
+    public async Task<IReadOnlyList<VistaGruposGuardia>> ObtenerVistasAsync(
+        bool incluirInactivos,
+        CancellationToken cancellationToken)
+    {
+        var query = _context.VistaGruposGuardia.AsNoTracking();
+
+        if (!incluirInactivos)
+        {
+            query = query.Where(grupo => grupo.Activo == true);
+        }
+
+        return await query
+            .OrderBy(grupo => grupo.GrupoNombre)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<VistaGruposGuardia?> ObtenerVistaPorIdAsync(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        return _context.VistaGruposGuardia
+            .AsNoTracking()
+            .FirstOrDefaultAsync(grupo => grupo.IdGrupoGuardia == id, cancellationToken);
     }
 
     public async Task<IReadOnlyList<GrupoGuardia>> ObtenerTodosAsync(

@@ -73,6 +73,22 @@ public sealed class PlanGuardiaRepository : IPlanGuardiaRepository
     }
 
     // =========================================================
+    // CONSULTAR DETALLES DEL PLAN CON DATOS DESCRIPTIVOS
+    // =========================================================
+
+    public async Task<IReadOnlyList<VistaDetallePlanGuardia>> ObtenerDetallesAsync(
+        int idPlanGuardia)
+    {
+        return await _context.VistaDetallePlanGuardia
+            .AsNoTracking()
+            .Where(d => d.IdPlanGuardia == idPlanGuardia)
+            .OrderBy(d => d.FechaGuardia)
+            .ThenBy(d => d.HoraInicio)
+            .ThenBy(d => d.PersonaNombreCompleto)
+            .ToListAsync();
+    }
+
+    // =========================================================
     // OBTENER ENTIDAD CON DETALLES Y ESTADO
     // =========================================================
 
