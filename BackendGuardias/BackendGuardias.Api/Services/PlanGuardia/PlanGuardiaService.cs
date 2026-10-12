@@ -254,7 +254,9 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
     }
 
     // =========================================================
-    // PLANIFICACIÓN AUTOMÁTICA MENSUAL
+    // PLANIFICACIÓN AUTOMÁTICA POR PERÍODO
+    // Recibe fecha inicial y fecha final y planifica todos los
+    // días entre ambas (inclusive).
     // =========================================================
 
     public async Task<VistaPlanGuardia> PlanificarAutomaticamenteAsync(
@@ -265,15 +267,25 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
 
         ValidarId(idPersonaActor, nameof(idPersonaActor));
 
-        if (dto.Anio < 1 || dto.Anio > 9998)
-        {
-            throw new ArgumentException("El año no es válido.");
-        }
+        var fechaInicial = dto.FechaInicial.Date;
+        var fechaFin = dto.FechaFin.Date;
 
-        if (dto.Mes < 1 || dto.Mes > 12)
+        if (dto.FechaInicial == default || dto.FechaFin == default)
         {
             throw new ArgumentException(
-                "El mes debe estar entre 1 y 12.");
+                "La fecha inicial y la fecha final son obligatorias.");
+        }
+
+        if (fechaInicial > fechaFin)
+        {
+            throw new ArgumentException(
+                "La fecha inicial no puede ser posterior a la fecha final.");
+        }
+
+        if ((fechaFin - fechaInicial).TotalDays > 366)
+        {
+            throw new ArgumentException(
+                "El período a planificar no puede superar un año.");
         }
 
         if (dto.CantidadPersonasPorGrupoPorDia < 1 ||
@@ -286,11 +298,8 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
         ValidarHora(dto.HoraInicio, nameof(dto.HoraInicio));
         ValidarHora(dto.HoraFin, nameof(dto.HoraFin));
 
-        var fechaInicial = new DateTime(dto.Anio, dto.Mes, 1);
-        var fechaFin = fechaInicial.AddMonths(1).AddDays(-1);
-
         // -----------------------------------------------------
-        // 1. Consultar feriados.
+        // 1. Consultar feriados del período.
         //
         // Si falla la consulta o no hay registros, continuar
         // sin considerar feriados.
@@ -312,29 +321,47 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
             if (feriados.Count == 0)
             {
                 _logger.LogInformation(
-                    "No hay feriados registrados para {Mes:D2}/{Anio}. " +
+                    "No hay feriados registrados para el período {FechaInicial:yyyy-MM-dd} - {FechaFin:yyyy-MM-dd}. " +
                     "Se continuará sin ponderación de feriados.",
-                    dto.Mes,
-                    dto.Anio);
+                    fechaInicial,
+                    fechaFin);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(
                 ex,
-                "No se pudieron consultar los feriados de {Mes:D2}/{Anio}. " +
+                "No se pudieron consultar los feriados del período {FechaInicial:yyyy-MM-dd} - {FechaFin:yyyy-MM-dd}. " +
                 "Se continuará con la planificación sin considerar feriados.",
-                dto.Mes,
-                dto.Anio);
+                fechaInicial,
+                fechaFin);
         }
 
         // -----------------------------------------------------
         // 2. Comprobar que no haya otro plan solapado.
+        //
+        // El mensaje identifica exactamente qué días del período
+        // ya están cubiertos por planes existentes.
         // -----------------------------------------------------
 
-        await ValidarSolapamientoAsync(
-            fechaInicial,
-            fechaFin);
+        var diasSolapados =
+            await _repository.ObtenerFechasSolapadasAsync(
+                fechaInicial,
+                fechaFin);
+
+        if (diasSolapados.Count > 0)
+        {
+            var listadoDias = string.Join(
+                ", ",
+                diasSolapados
+                    .OrderBy(f => f)
+                    .Select(f => f.ToString("yyyy-MM-dd")));
+
+            throw new InvalidOperationException(
+                "Ya existe un plan de guardia con la planificación de " +
+                $"algunos días del período solicitado: {listadoDias}. " +
+                "No se creó el plan automático.");
+        }
 
         // -----------------------------------------------------
         // 3. Obtener integrantes activos de grupos de guardia.
@@ -348,7 +375,7 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
         if (miembros.Count == 0)
         {
             throw new InvalidOperationException(
-                "No existen integrantes activos de grupos de guardia en ese mes.");
+                "No existen integrantes activos de grupos de guardia en ese período.");
         }
 
         var idsPersonas = miembros
@@ -357,7 +384,7 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
             .ToArray();
 
         // -----------------------------------------------------
-        // 4. Obtener afectaciones que se solapan con el mes.
+        // 4. Obtener afectaciones que se solapan con el período.
         // -----------------------------------------------------
 
         var afectaciones =
@@ -368,9 +395,6 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
 
         // -----------------------------------------------------
         // 5. Historial aprobado de los 12 meses anteriores.
-        //
-        // Al abarcar desde el primer día del mismo mes del año
-        // anterior, este historial incluye también ese mes.
         // -----------------------------------------------------
 
         var fechaInicioHistorial = fechaInicial.AddMonths(-12);
@@ -389,7 +413,8 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
         var mesAnteriorFinal = fechaInicial.AddDays(-1);
 
         var mismoMesAnioAnteriorInicial = fechaInicial.AddYears(-1);
-        var mismoMesAnioAnteriorFinal = fechaFin.AddYears(-1);
+        var mismoMesAnioAnteriorFinal =
+            fechaInicial.AddYears(-1).AddMonths(1).AddDays(-1);
 
         // -----------------------------------------------------
         // 6. Preparar contadores para repartir la carga.
@@ -405,14 +430,19 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
         var detalles = new List<DetallePlanGuardia>();
 
         // -----------------------------------------------------
-        // 7. Recorrer cada día del mes y cada grupo con
+        // 7. Recorrer cada día del período y cada grupo con
         // integrantes vigentes.
+        //
+        // Regla de sexo: las personas de sexo FEMENINO no se
+        // asignan a guardias de fines de semana (sábado/domingo).
         // -----------------------------------------------------
 
         for (var fecha = fechaInicial.Date;
              fecha <= fechaFin.Date;
              fecha = fecha.AddDays(1))
         {
+            var esFinDeSemanaDelDia = EsFinDeSemana(fecha);
+
             var gruposDelDia = miembros
                 .Where(m =>
                     m.FechaInicio.Date <= fecha &&
@@ -441,6 +471,8 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
                 {
                     // No asignar a quien tenga una afectación,
                     // cumpla años o ya tenga guardia ese día.
+                    // En fines de semana tampoco se asigna a
+                    // personas de sexo femenino.
                     var candidatos = miembrosGrupo
                         .Where(m =>
                             !personasAsignadasPorFecha.Contains(
@@ -451,7 +483,9 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
                                 fecha) &&
                             !EsCumpleanos(
                                 m.CarnetIdentidad,
-                                fecha))
+                                fecha) &&
+                            !(esFinDeSemanaDelDia &&
+                              EsMujer(m.Sexo)))
                         .ToList();
 
                     if (candidatos.Count == 0)
@@ -460,10 +494,16 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
                             .Select(m => m.GrupoNombre)
                             .FirstOrDefault() ?? grupo.Key.ToString();
 
+                        var motivoSexo = esFinDeSemanaDelDia &&
+                            miembrosGrupo.Any(m => !EsMujer(m.Sexo))
+                                ? string.Empty
+                                : " Las mujeres no se planifican en fines de semana.";
+
                         throw new InvalidOperationException(
                             $"No hay suficientes personas disponibles del grupo " +
-                            $"'{nombreGrupo}' el día {fecha:yyyy-MM-dd}. " +
-                            "No se creó el plan.");
+                            $"'{nombreGrupo}' el día {fecha:yyyy-MM-dd}." +
+                            motivoSexo +
+                            " No se creó el plan.");
                     }
 
                     // Orden de equidad:
@@ -571,11 +611,11 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
         await _repository.CrearAsync(plan);
 
         _logger.LogInformation(
-            "Plan {IdPlanGuardia} generado para {Mes:D2}/{Anio}, " +
-            "con {CantidadAsignaciones} asignaciones.",
+            "Plan {IdPlanGuardia} generado para el período {FechaInicial:yyyy-MM-dd} - " +
+            "{FechaFin:yyyy-MM-dd}, con {CantidadAsignaciones} asignaciones.",
             plan.IdPlanGuardia,
-            dto.Mes,
-            dto.Anio,
+            fechaInicial,
+            fechaFin,
             detalles.Count);
 
         return await ObtenerPorIdAsync(plan.IdPlanGuardia);
@@ -866,6 +906,29 @@ public sealed class PlanGuardiaService : IPlanGuardiaService
     {
         return fecha.DayOfWeek is
             DayOfWeek.Saturday or DayOfWeek.Sunday;
+    }
+
+    // =========================================================
+    // SEXO
+    //
+    // Regla del módulo: las mujeres (sexo "Femenino") no se
+    // planifican en fines de semana. Se aceptan las variantes
+    // más comunes del catálogo de sexos de la base `persona`.
+    // =========================================================
+
+    private static bool EsMujer(string? sexo)
+    {
+        if (string.IsNullOrWhiteSpace(sexo))
+        {
+            return false;
+        }
+
+        var valor = sexo.Trim();
+
+        return valor.Equals("F", StringComparison.OrdinalIgnoreCase) ||
+               valor.Equals("Femenino", StringComparison.OrdinalIgnoreCase) ||
+               valor.Equals("Mujer", StringComparison.OrdinalIgnoreCase) ||
+               valor.Equals("Female", StringComparison.OrdinalIgnoreCase);
     }
 
     // =========================================================

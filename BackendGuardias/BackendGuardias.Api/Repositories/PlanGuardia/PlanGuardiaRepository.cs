@@ -111,6 +111,48 @@ public sealed class PlanGuardiaRepository : IPlanGuardiaRepository
     }
 
     // =========================================================
+    // OBTENER LOS DÍAS DEL PERÍODO QUE YA TIENEN PLAN
+    // =========================================================
+
+    public async Task<IReadOnlyList<DateTime>> ObtenerFechasSolapadasAsync(
+        DateTime fechaInicial,
+        DateTime fechaFin)
+    {
+        var periodos = await _context.PlanGuardia
+            .AsNoTracking()
+            .Where(p =>
+                p.FechaInicial <= fechaFin.Date &&
+                p.FechaFin >= fechaInicial.Date)
+            .Select(p => new
+            {
+                p.FechaInicial,
+                p.FechaFin
+            })
+            .ToListAsync();
+
+        if (periodos.Count == 0)
+        {
+            return Array.Empty<DateTime>();
+        }
+
+        var dias = new List<DateTime>();
+
+        for (var fecha = fechaInicial.Date;
+             fecha <= fechaFin.Date;
+             fecha = fecha.AddDays(1))
+        {
+            if (periodos.Any(p =>
+                    p.FechaInicial.Date <= fecha &&
+                    p.FechaFin.Date >= fecha))
+            {
+                dias.Add(fecha);
+            }
+        }
+
+        return dias;
+    }
+
+    // =========================================================
     // COMPROBAR RESPONSABLE DE APROBACIÓN
     // =========================================================
 

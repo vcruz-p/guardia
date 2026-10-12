@@ -328,7 +328,9 @@ public sealed class PlanGuardiaController : ControllerBase
 
     // =========================================================
     // POST: api/PlanGuardia/planificacion-automatica
-    // Generar un plan para un mes completo.
+    // Genera un plan automático para el período comprendido
+    // entre la fecha inicial y la fecha final recibidas.
+    // Si algún día del período ya tiene plan, devuelve 409.
     // =========================================================
 
     [HttpPost("planificacion-automatica")]
@@ -379,9 +381,9 @@ public sealed class PlanGuardiaController : ControllerBase
         {
             _logger.LogError(
                 ex,
-                "Error al generar el plan automático para {Anio}-{Mes}.",
-                dto.Anio,
-                dto.Mes);
+                "Error al generar el plan automático para {FechaInicial:yyyy-MM-dd} - {FechaFin:yyyy-MM-dd}.",
+                dto?.FechaInicial ?? default,
+                dto?.FechaFin ?? default);
 
             return Problem(
                 title: "Error al generar el plan automático.",

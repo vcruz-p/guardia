@@ -33,6 +33,16 @@ public interface IPlanGuardiaRepository
         DateTime fechaFin,
         int? excluirIdPlanGuardia = null);
 
+    /// <summary>
+    /// Devuelve los días concretos del período que ya están
+    /// cubiertos por planes de guardia existentes. Se usa para
+    /// dar un mensaje de error preciso en la planificación
+    /// automática cuando algún día ya tiene plan.
+    /// </summary>
+    Task<IReadOnlyList<DateTime>> ObtenerFechasSolapadasAsync(
+        DateTime fechaInicial,
+        DateTime fechaFin);
+
     Task<bool> EsResponsableAprobacionAsync(
         int idPersona);
 
